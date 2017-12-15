@@ -10,7 +10,7 @@ class NewProc(ModuleBase):
 
     @property
     def absolute_duration(self):
-        return 16 * 60  # 16 minutes
+        return 60 * 60  # 60 minutes
 
     def run(self):
         self.start()
@@ -22,6 +22,6 @@ class NewProc(ModuleBase):
             os.kill(pid, signal.SIGKILL)
             self.hec_logger('Killed child process', pid=pid)
         except Exception as e:
-            self.hec_logger('Couldn\'t kill child process: ' + str(e))
+            self.hec_logger('Couldn\'t kill child process', severity='error', pid=pid, error=str(e))
         self.util_orphanwait(pid)
         self.finish()

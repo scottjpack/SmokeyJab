@@ -10,7 +10,7 @@ class CpuSpike(ModuleBase):
 
     @property
     def absolute_duration(self):
-        return 16 * 60  # 16 minutes
+        return 60 * 60  # 16 minutes
 
     def spike(self):
         import time

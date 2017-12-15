@@ -11,7 +11,7 @@ class NetworkConnections(ModuleBase):
 
     @property
     def absolute_duration(self):
-        return 16 * 60  # 16 minutes
+        return 60 * 60  # 60 minutes
 
     def run(self):
         self.start()

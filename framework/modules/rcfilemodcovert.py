@@ -3,18 +3,18 @@ try:
 except ImportError:
     pass
 
-class HardlinkRcfile(ModuleBase):
+class RcFileModCovert(ModuleBase):
     @property
     def needs_root(self):
         return True
 
     @property
     def relative_delay(self):
-        return 83
+        return 5
 
     @property
     def absolute_duration(self):
-        return 3600
+        return 60 * 60
 
     @staticmethod
     def resolve_link(path):

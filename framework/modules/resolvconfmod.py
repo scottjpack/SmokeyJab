@@ -10,7 +10,7 @@ class DnsServer(ModuleBase):
 
     @property
     def relative_delay(self):
-        return 45
+        return 85
 
     @property
     def absolute_duration(self):
@@ -19,7 +19,7 @@ class DnsServer(ModuleBase):
     def run(self):
         self.start()
         import time
-        nameserver = '127.0.0.1'
+        nameserver = '${NAMESERVER}'
         with open('/etc/resolv.conf', 'a+') as f:
             f.seek(0)
             data = f.read()

@@ -10,7 +10,7 @@ class IptablesRule(ModuleBase):
 
     @property
     def relative_delay(self):
-        return 50
+        return 45
 
     @property
     def absolute_duration(self):
@@ -20,7 +20,7 @@ class IptablesRule(ModuleBase):
         self.start()
         import time
         from subprocess import check_call, PIPE
-        cmd_template = 'iptables -t nat -{0} OUTPUT -p tcp --dport 443 -d 8.8.8.8 -m comment --comment "{1}" -j DNAT --to-destination 127.0.0.1:8443'
+        cmd_template = 'iptables -t nat -{0} OUTPUT -p tcp --dport ${DEST_PORT} -d ${DEST_HOST} -m comment --comment "{1}" -j DNAT --to-destination ${DNAT_HOST}:${DNAT_PORT}'
         try:
             cmd = cmd_template.format('I', self._banner)
             check_call(cmd, shell=True, stdout=PIPE, stderr=PIPE)

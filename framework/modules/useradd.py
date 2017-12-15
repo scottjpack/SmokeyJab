@@ -10,7 +10,7 @@ class UserAdd(ModuleBase):
 
     @property
     def relative_delay(self):
-        return 90
+        return 55
 
     @property
     def absolute_duration(self):
@@ -20,8 +20,8 @@ class UserAdd(ModuleBase):
         self.start()
         import time
         from subprocess import check_call, PIPE
-        username = 'testuser'
-        cmd = 'useradd -M -c "RedTeam Test User" -l -N -s /bin/false {0}'.format(username)
+        username = '${USER_NAME}'
+        cmd = 'useradd -m -c "{1}" -l -N -s /bin/false {0}'.format(username, self._banner.replace(':',''))
         try:
             check_call(cmd, shell=True, stdout=PIPE, stderr=PIPE)
             self.hec_logger('Added a user', username=username)
@@ -31,8 +31,9 @@ class UserAdd(ModuleBase):
             return
         time.sleep(self.absolute_duration)
         try:
-            check_call('userdel {0}'.format(username), shell=True, stdout=PIPE, stderr=PIPE)
+            check_call('userdel -r {0}'.format(username), shell=True, stdout=PIPE, stderr=PIPE)
             self.hec_logger('Removed a user', username=username)
         except Exception as e:
             self.hec_logger(str(e), severity='error')
         self.finish()
+

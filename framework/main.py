@@ -12,6 +12,7 @@ import select
 import signal
 import socket
 import ssl
+import struct
 import sys
 import threading
 import time
@@ -58,8 +59,7 @@ class ModuleBase(object):
         # NOTE: This only affects computation of minimum test duration! You're responsible for sleeping!
         raise NotImplementedError('Specify an duration that the module expects to run')
 
-    @staticmethod
-    def util_childproc(fname=None, func=None, args=()):
+    def util_childproc(self, fname=None, func=None, args=()):
         (r, w) = os.pipe()
         if os.fork() == 0:
             pid = os.fork()
@@ -75,10 +75,10 @@ class ModuleBase(object):
         pid = int(os.read(r, 8))
         os.close(r)
         os.close(w)
+        self.hec_logger('Created a new process', severity='info', process_id=pid)
         return pid
 
-    @staticmethod
-    def util_netconnect(host, timeout=60):
+    def util_netconnect(self, host, timeout=60):
         def proxy(_sock, _host, _timeout):
             s = socket.socket()
             s.settimeout(_timeout)
@@ -98,24 +98,25 @@ class ModuleBase(object):
                 s.close()
                 _sock.close()
                 sys.exit()
-
+        self.hec_logger('Creating outbound connection', severity='info', host=host)
         parent_sock, child_sock = socket.socketpair(socket.AF_UNIX)
-        ModuleBase.util_childproc(func=proxy, args=(child_sock, host, timeout))
+        self.util_childproc(func=proxy, args=(child_sock, host, timeout))
         return parent_sock
 
-    @staticmethod
-    def util_orphanwait(pid, timeout=0):
+    def util_orphanwait(self, pid, timeout=0):
         start = time.time()
         while True:
             if (time.time() - start > timeout) and timeout != 0:
                 try:
+                    self.hec_logger('Timeout reached, killing process', severity='info', process_id=pid)
                     os.kill(pid, signal.SIGINT)
-                except:
-                    pass
+                except Exception as e:
+                    self.hec_logger('Error killing process', process_id=pid, error=str(e))
                 break
             try:
                 os.kill(pid, 0)
             except OSError:
+                self.hec_logger('Process no longer exists, exiting waitloop', severity='debug', pid=pid)
                 break
             time.sleep(1)
         return
@@ -137,14 +138,14 @@ class ModuleBase(object):
         }
         headers = {'Authorization': 'Splunk ${SPLUNK_TOKEN}', 'Content-Type': 'application/json'}
         try:
-            if sys.version_info >= (2, 7, 9):
-                https = httplib.HTTPSConnection('${SPLUNK_HOST}', context=ssl._create_unverified_context())
-            else:
+            https = httplib.HTTPSConnection('${SPLUNK_HOST}', context=ssl._create_unverified_context())
+        except:
+            # "context" key must not be recognized (should be v2.7.9 but that doesn't seem to be strictly true)
+            try:
                 https = httplib.HTTPSConnection('${SPLUNK_HOST}')
-            https.request('POST', '/services/collector', body=json.dumps(data), headers=headers)
-        except Exception as e:
-            pass
-        return
+            except:
+                return
+        https.request('POST', '/services/collector', body=json.dumps(data), headers=headers)
 
     def finish(self):
         self.hec_logger('', action='finish')
@@ -157,6 +158,43 @@ class ModuleBase(object):
     def run(self):
         # Your module functionality here
         raise NotImplementedError('Module functionality undefined')
+
+class Utils(object):
+    @staticmethod
+    def routes():
+        """ returns (iface, net address, subnet, gateway) tuple """
+        def lehex2ip(x):
+            return socket.inet_ntoa(x.decode('hex')[::-1])
+        with open('/proc/net/route') as f:
+            for i, line in enumerate(f):
+                if i == 0:
+                    continue
+                line = line.split()
+                yield (line[0], lehex2ip(line[1]), lehex2ip(line[7]), lehex2ip(line[2]))
+
+    @staticmethod
+    def subnet2list(ip, subnet):
+        ipi, = struct.unpack(b'!I', socket.inet_aton(ip))
+        maski, = struct.unpack(b'!I', socket.inet_aton(subnet))
+        for i in range((ipi & maski) + 1, ipi | (maski ^ 0xffffffff)):
+            yield socket.inet_ntoa(struct.pack(b'!I', i))
+
+    @staticmethod
+    def cidr2list(ip, cidr):
+        ipi, = struct.unpack(b'!I', socket.inet_aton(ip))
+        maski = (0xffffffff << (32-cidr)) & 0xffffffff
+        for i in range((ipi & maski) + 1, ipi | (maski ^ 0xffffffff)):
+            yield socket.inet_ntoa(struct.pack(b'!I', i))
+
+    @staticmethod
+    def iface2ip(iface):
+        import socket, struct, fcntl
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        return socket.inet_ntoa(fcntl.ioctl(
+            s.fileno(),
+            0x8915,  # SIOCGIFADDR
+            struct.pack(b'256s', iface[:15])
+        )[20:24])
 
 
 def hide():
@@ -216,10 +254,17 @@ def __start__():
         wait_time = module.relative_delay / 100.0 * EXECUTION_WINDOW
         threading.Timer(wait_time, module.run).start()
         main.hec_logger('Spawned a module thread'.format(module.module_name), severity='debug', ioc=module.module_name,
-                        delay='{:>02}:{:>02}:{:>02}:{:>02}'.format(*time_breakdown(wait_time)))
+                        delay='{0:>02}:{1:>02}:{2:>02}:{3:>02}'.format(*time_breakdown(wait_time)))
     while not all(get_all_status()):
+        # reap/report zombies created by lazy coding... ;-)
+        try:
+            pid, ret, res = os.wait3(os.WNOHANG)
+            main.hec_logger('Cleaned up a zombie process', severity='warning', pid=pid)
+        except OSError:
+            pass
+        # Sleep before polling to keep CPU usage down
         time.sleep(1)
-    main.hec_logger('Terminating framework', action='finish', severity='info', pid=os.getpid())
+    main.hec_logger('Terminating framework normally', action='finish', severity='info', pid=os.getpid())
 
 
 if __name__ == '__main__':

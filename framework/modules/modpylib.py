@@ -10,11 +10,11 @@ class PyLibModify(ModuleBase):
 
     @property
     def relative_delay(self):
-        return 75
+        return 35
 
     @property
     def absolute_duration(self):
-        return 3600
+        return 60 * 60
 
     def run(self):
         self.start()

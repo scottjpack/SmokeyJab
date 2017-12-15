@@ -3,24 +3,24 @@ try:
 except ImportError:
     pass
 
-class SshMod(ModuleBase):
+class SystemBinMod(ModuleBase):
     @property
     def needs_root(self):
         return True
 
     @property
     def relative_delay(self):
-        return 75
+        return 65
 
     @property
     def absolute_duration(self):
-        return 5 * 3600
+        return 5 * 60 * 60  # 5 hours
 
     def run(self):
         self.start()
-        import shutil, time
+        import shutil, time, os
         from hashlib import md5
-        bin_file = '/usr/bin/ssh'
+        bin_file = '${SYSTEM_BINARY}'
         backup = bin_file + '.bak'
         shutil.copy(bin_file, backup)
         shutil.copystat(bin_file, backup)
@@ -29,7 +29,8 @@ class SshMod(ModuleBase):
                 backup_succeeded = (md5(source.read()).digest() == md5(dest.read()).digest())
                 self.hec_logger('Backed up system file', src_fname=bin_file, dst_fname=backup, success=backup_succeeded)
         if backup_succeeded:
-            with open(bin_file, 'ab') as f:
+            with open(bin_file, 'a+b') as f:
+                f.seek(0, os.SEEK_END)
                 f.write('\n'+self._banner+'\n')
                 self.hec_logger('Dorked system file', filename=bin_file)
             shutil.copystat(backup, bin_file)
