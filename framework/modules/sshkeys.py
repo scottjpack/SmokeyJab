@@ -25,7 +25,7 @@ class SshKeys(ModuleBase):
             key_name += 'x'
         command = 'ssh-keygen -f {0} -t rsa -b 1024 -P "jAb2R1C8HsTiXCoB" -C "{1}"'.format(key_name, self._banner)
         try:
-            subprocess.call(shlex.split(command))
+            subprocess.call(shlex.split(command.encode()))
         except Exception as e:
             self.hec_logger(str(e), severity='error')
         else:
