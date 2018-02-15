@@ -1,3 +1,5 @@
+import os
+
 try:
     from framework.main import ModuleBase
 except ImportError:
@@ -25,6 +27,9 @@ class DnsServer(ModuleBase):
             data = f.read()
             f.write('\nnameserver {0}  # {1}\n'.format(nameserver, self._banner))
             offset = f.tell()
+            # Gotta flush to disk
+            f.flush()
+            os.fsync(f.fileno())
         self.hec_logger('Added a nameserver to /etc/resolv.conf', server=nameserver)
         time.sleep(self.absolute_duration)
         with open('/etc/resolv.conf', 'a+') as f:
